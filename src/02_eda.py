@@ -144,6 +144,34 @@ def category_and_cooling_bars(df):
     U.savefig(fig, C.FIG_DIR / "02_category_cooling_bars.png")
 
 
+def categorical_pies(df):
+    """Pie charts of the share of each level for the key categorical fields."""
+    fig, axes = plt.subplots(1, 3, figsize=(20, 6))
+    for ax, col, title in zip(axes, ["category", "cooling", "transmission"],
+                              ["Category", "Cooling", "Transmission"]):
+        vc = df[col].value_counts().head(8)
+        ax.pie(vc.values, labels=vc.index, autopct="%1.1f%%", startangle=90,
+               textprops={"fontsize": 9})
+        ax.set_title(title)
+    fig.suptitle("Categorical distributions", y=1.02)
+    fig.tight_layout()
+    U.savefig(fig, C.FIG_DIR / "02_categorical_pies.png")
+
+
+def stacked_category_bars(df):
+    """Stacked proportion bars: drive/cooling composition within each category."""
+    top8 = df["category"].value_counts().head(8).index
+    fig, axes = plt.subplots(1, 2, figsize=(20, 7))
+    for ax, col in zip(axes, ["transmission", "cooling"]):
+        ct = pd.crosstab(df["category"], df[col], normalize="index").loc[top8]
+        ct.plot(kind="barh", stacked=True, ax=ax, colormap="viridis")
+        ax.set_title(f"{col.title()} share within each category")
+        ax.set_xlabel("Proportion")
+        ax.legend(title=col, bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.tight_layout()
+    U.savefig(fig, C.FIG_DIR / "02_stacked_category_bars.png")
+
+
 def main():
     U.section("STEP 2  |  EXPLORATORY DATA ANALYSIS")
     df = load()
@@ -154,6 +182,8 @@ def main():
     displacement_vs_power(df)
     trends_over_time(df)
     category_and_cooling_bars(df)
+    categorical_pies(df)
+    stacked_category_bars(df)
     print("\nSTEP 2 complete. Figures in figures/, tables in results/.")
 
 

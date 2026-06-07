@@ -5,7 +5,7 @@ Dep. Variable:                   ltop   R-squared:                       0.893
 Model:                            OLS   Adj. R-squared:                  0.893
 Method:                 Least Squares   F-statistic:                     6897.
 Date:                Mon, 08 Jun 2026   Prob (F-statistic):               0.00
-Time:                        00:19:57   Log-Likelihood:                 638.39
+Time:                        04:03:39   Log-Likelihood:                 638.39
 No. Observations:                1648   AIC:                            -1271.
 Df Residuals:                    1645   BIC:                            -1255.
 Df Model:                           2                                         
@@ -34,7 +34,7 @@ Dep. Variable:          top_speed_kmh   R-squared:                       0.864
 Model:                            OLS   Adj. R-squared:                  0.863
 Method:                 Least Squares   F-statistic:                     1134.
 Date:                Mon, 08 Jun 2026   Prob (F-statistic):               0.00
-Time:                        00:19:57   Log-Likelihood:                -4966.0
+Time:                        04:03:39   Log-Likelihood:                -4966.0
 No. Observations:                1081   AIC:                             9946.
 Df Residuals:                    1074   BIC:                             9981.
 Df Model:                           6                                         

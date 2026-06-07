@@ -1,0 +1,3 @@
+model,test_accuracy,test_macro_f1
+GradientBoosting,0.7930,0.7490
+VotingEnsemble,0.7990,0.7550

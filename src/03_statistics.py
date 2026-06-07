@@ -103,6 +103,18 @@ def a_normality(df):
     log("   (on log scale) with non-parametric tests on the raw scale.")
     U.save_table(tab, C.RESULTS_DIR / "stat_A_normality.csv", index=False)
 
+    # figure: histogram + Q-Q for a representative spec (raw vs log) -> shows non-normality
+    x = df["power_hp"].dropna()
+    xl = np.log(x[x > 0])
+    fig, ax = plt.subplots(2, 2, figsize=(13, 10))
+    sns.histplot(x, bins=40, kde=True, ax=ax[0, 0], color="#4C72B0"); ax[0, 0].set_title("power_hp (raw)")
+    sm.qqplot(x, line="s", ax=ax[0, 1], markersize=3, alpha=0.3); ax[0, 1].set_title("power_hp raw: Q-Q")
+    sns.histplot(xl, bins=40, kde=True, ax=ax[1, 0], color="#55A868"); ax[1, 0].set_title("log(power_hp)")
+    sm.qqplot(xl, line="s", ax=ax[1, 1], markersize=3, alpha=0.3); ax[1, 1].set_title("log(power_hp): Q-Q")
+    fig.suptitle("Normality check: raw is right-skewed, log is closer to normal", y=1.01)
+    fig.tight_layout()
+    U.savefig(fig, C.FIG_DIR / "03_normality_qq.png")
+
 
 def b_two_group(df):
     U.section("B. Two-group comparison -- power: Liquid- vs Air-cooled")
@@ -158,6 +170,17 @@ def c_kgroup(df):
     log(f"Tukey HSD: {n_sig} of {len(tdf)} category pairs differ significantly "
         f"(see stat_C_tukey.csv).")
 
+    # figure: power distribution per category (visual companion to ANOVA/Kruskal)
+    order = sub.groupby("category")["power_hp"].median().sort_values(ascending=False).index
+    fig, ax = plt.subplots(figsize=(13, 7))
+    sns.boxplot(data=sub, x="category", y="power_hp", order=order, showfliers=False,
+                hue="category", palette="viridis", legend=False, ax=ax)
+    ax.set_title("Power by category (ANOVA / Kruskal-Wallis)")
+    ax.set_ylabel("Power (HP)"); ax.set_xlabel(""); ax.tick_params(axis="x", rotation=35)
+    for lbl in ax.get_xticklabels():
+        lbl.set_ha("right")
+    U.savefig(fig, C.FIG_DIR / "03_power_by_category_anova.png")
+
 
 def d_correlation(df):
     U.section("D. Correlation tests (Pearson & Spearman)")
@@ -179,6 +202,19 @@ def d_correlation(df):
     U.save_table(tab, C.RESULTS_DIR / "stat_D_correlation.csv", index=False)
     log("-> Strong positive relationships; all p-values are effectively zero.")
 
+    # figure: scatter + regression line for the two headline pairs (with r)
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+    for ax, (xa, xb) in zip(axes, [("displacement_ccm", "power_hp"),
+                                   ("power_hp", "top_speed_kmh")]):
+        s = df[[xa, xb]].dropna()
+        s = s.sample(min(3000, len(s)), random_state=C.RANDOM_STATE)
+        r = stats.pearsonr(s[xa], s[xb])[0]
+        sns.regplot(data=s, x=xa, y=xb, ax=ax,
+                    scatter_kws={"s": 8, "alpha": 0.2}, line_kws={"color": "red"})
+        ax.set_title(f"{xa} ~ {xb}  (Pearson r = {r:.2f})")
+    fig.tight_layout()
+    U.savefig(fig, C.FIG_DIR / "03_correlation_scatter.png")
+
 
 def e_independence(df):
     U.section("E. Chi-square test of independence -- cooling x transmission")
@@ -196,6 +232,12 @@ def e_independence(df):
     log("   DEPENDENT, but Cramer's V ~ 0.10 means the association is weak -- knowing")
     log("   one feature only mildly shifts the odds of the other in practice.")
     U.save_table(ct, C.RESULTS_DIR / "stat_E_contingency.csv")
+
+    # figure: contingency heatmap (counts) -- visual companion to the chi-square test
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.heatmap(ct, annot=True, fmt="d", cmap="Blues", ax=ax)
+    ax.set_title("Cooling x transmission (observed counts)")
+    U.savefig(fig, C.FIG_DIR / "03_contingency_heatmap.png")
 
 
 def f_regression(df):
@@ -271,6 +313,16 @@ def g_one_sample(df):
     log(f"one-sample t = {t:.1f},  p = {p:.2e},  95% CI = ({ci[0]:.3f}, {ci[1]:.3f})")
     log("-> mean rating is significantly ABOVE 3.0: users skew positive.")
 
+    # figure: rating distribution with the test value (3.0), the mean, and its 95% CI
+    fig, ax = plt.subplots(figsize=(9, 5))
+    sns.histplot(r, bins=30, kde=True, ax=ax, color="#4C72B0")
+    ax.axvline(3.0, color="black", ls="--", label="test value 3.0")
+    ax.axvline(r.mean(), color="red", label=f"mean {r.mean():.2f}")
+    ax.axvspan(ci[0], ci[1], color="red", alpha=0.15, label="95% CI of mean")
+    ax.set_title("One-sample t-test: rating vs neutral 3.0")
+    ax.set_xlabel("rating"); ax.legend()
+    U.savefig(fig, C.FIG_DIR / "03_one_sample_rating.png")
+
 
 def h_paired(df):
     U.section("H. Paired tests -- bore vs stroke within the same engine")
@@ -309,6 +361,16 @@ def i_two_proportion(df):
     log(f"two-proportion z = {z:.1f},  p = {p:.2e}")
     log("-> fuel injection became significantly more prevalent in modern bikes.")
 
+    # figure: injection share by era
+    fig, ax = plt.subplots(figsize=(7, 5))
+    shares = [counts[0] / nobs[0] * 100, counts[1] / nobs[1] * 100]
+    bars = ax.bar(["modern (>=2010)", "older (<2010)"], shares,
+                  color=["#4C72B0", "#C44E52"])
+    ax.bar_label(bars, fmt="%.1f%%")
+    ax.set_ylabel("% fuel injection")
+    ax.set_title("Injection adoption by era (two-proportion z-test)")
+    U.savefig(fig, C.FIG_DIR / "03_injection_by_era.png")
+
 
 def j_goodness_of_fit(df):
     U.section("J. Chi-square goodness-of-fit -- are cooling systems equally common?")
@@ -320,6 +382,94 @@ def j_goodness_of_fit(df):
     log(f"chi-square (GoF) = {chi2:.1f},  p = {p:.2e}")
     log("-> the three cooling systems are NOT equally common (oil & air is rare).")
     U.save_table(obs.rename("count").to_frame(), C.RESULTS_DIR / "stat_J_cooling_counts.csv")
+
+    # figure: observed vs expected counts (visual companion to the GoF test)
+    fig, ax = plt.subplots(figsize=(7, 5))
+    xpos = np.arange(len(obs))
+    ax.bar(xpos - 0.2, obs.values, 0.4, label="observed", color="#4C72B0")
+    ax.bar(xpos + 0.2, exp, 0.4, label="expected (uniform)", color="#C44E52")
+    ax.set_xticks(xpos); ax.set_xticklabels(obs.index)
+    ax.set_ylabel("count"); ax.legend()
+    ax.set_title("Cooling: observed vs expected (chi-square goodness-of-fit)")
+    U.savefig(fig, C.FIG_DIR / "03_gof_observed_expected.png")
+
+
+def k_bootstrap(df):
+    U.section("K. Bootstrap 95% CI -- mean power (Liquid vs Air)")
+    rng = np.random.default_rng(C.RANDOM_STATE)
+    def boot(x, n=1000):
+        x = np.asarray(x)
+        return np.array([rng.choice(x, len(x), replace=True).mean() for _ in range(n)])
+    liq = df.loc[df.cooling == "Liquid", "power_hp"].dropna().values
+    air = df.loc[df.cooling == "Air", "power_hp"].dropna().values
+    bl, ba = boot(liq), boot(air)
+    ci_l, ci_a = np.percentile(bl, [2.5, 97.5]), np.percentile(ba, [2.5, 97.5])
+    log(f"Liquid mean power 95% CI = [{ci_l[0]:.1f}, {ci_l[1]:.1f}] HP")
+    log(f"Air    mean power 95% CI = [{ci_a[0]:.1f}, {ci_a[1]:.1f}] HP")
+    log("-> non-overlapping CIs confirm the difference is robust (cf. test B).")
+    fig, ax = plt.subplots(1, 2, figsize=(15, 5))
+    for a, (bs, ci, name, c) in zip(ax, [(bl, ci_l, "Liquid", "#4C72B0"),
+                                         (ba, ci_a, "Air", "#C44E52")]):
+        a.hist(bs, bins=30, color=c)
+        a.axvline(ci[0], color="red", ls="--"); a.axvline(ci[1], color="red", ls="--")
+        a.set_title(f"Bootstrap mean power: {name}"); a.set_xlabel("Mean power (HP)")
+    fig.tight_layout()
+    U.savefig(fig, C.FIG_DIR / "03_bootstrap_power.png")
+
+
+def l_inferential_logit(df):
+    U.section("L. Inferential logistic regression -- P(liquid-cooled) with odds ratios")
+    from sklearn.preprocessing import StandardScaler
+    sub = df.dropna(subset=["cooling", "displacement_ccm", "power_hp",
+                            "compression_ratio", "top_speed_kmh"]).copy()
+    sub = sub[sub.cooling.isin(["Liquid", "Air"])]
+    sub["is_liquid"] = (sub.cooling == "Liquid").astype(int)
+    feats = ["displacement_ccm", "power_hp", "compression_ratio", "top_speed_kmh"]
+    # standardise so each odds ratio is the effect of a +1 SD change (comparable)
+    Xz = pd.DataFrame(StandardScaler().fit_transform(sub[feats]), columns=feats, index=sub.index)
+    Xz = sm.add_constant(Xz)
+    logit = sm.Logit(sub["is_liquid"], Xz).fit(disp=False)
+    res = pd.DataFrame({"coef": logit.params, "p_value": logit.pvalues,
+                        "odds_ratio": np.exp(logit.params)})
+    cint = logit.conf_int(); res["or_lo"] = np.exp(cint[0]); res["or_hi"] = np.exp(cint[1])
+    log(f"n = {int(logit.nobs):,}   Pseudo R^2 = {logit.prsquared:.3f}")
+    log(res.round(4).to_string())
+    U.save_table(res.round(4), C.RESULTS_DIR / "stat_L_logit_oddsratio.csv")
+    # forest plot of odds ratios (drop the intercept)
+    r2 = res.drop(index="const")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.errorbar(r2["odds_ratio"], range(len(r2)),
+                xerr=[r2["odds_ratio"] - r2["or_lo"], r2["or_hi"] - r2["odds_ratio"]],
+                fmt="o", color="#4C72B0", capsize=4)
+    ax.axvline(1.0, color="red", ls="--")
+    ax.set_yticks(range(len(r2))); ax.set_yticklabels(r2.index)
+    ax.set_xlabel("Odds ratio (per +1 SD)")
+    ax.set_title("P(liquid-cooled): odds ratios with 95% CI")
+    U.savefig(fig, C.FIG_DIR / "03_logit_oddsratio.png")
+
+
+def m_sample_size(df):
+    U.section("M. Sample-size sensitivity -- p-value vs n (power: Liquid vs Air)")
+    full = df.dropna(subset=["power_hp", "cooling"])
+    full = full[full.cooling.isin(["Liquid", "Air"])]
+    ns, ps = [], []
+    for n in [50, 100, 300, 1000, 3000, len(full)]:
+        s = full.sample(min(n, len(full)), random_state=C.RANDOM_STATE)
+        l = s.loc[s.cooling == "Liquid", "power_hp"]; a = s.loc[s.cooling == "Air", "power_hp"]
+        if len(l) > 5 and len(a) > 5:
+            _, p = stats.mannwhitneyu(l, a, alternative="two-sided")
+            ns.append(min(n, len(full))); ps.append(p)
+            log(f"n = {min(n, len(full)):>6}  ->  p = {p:.2e}")
+    U.save_table(pd.DataFrame({"sample_n": ns, "p_value": ps}),
+                 C.RESULTS_DIR / "stat_M_sample_size.csv", index=False)
+    log("-> p shrinks fast with n: at large n almost everything is 'significant'.")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(ns, ps, "o-", color="#4C72B0")
+    ax.axhline(C.ALPHA, color="red", ls="--", label=f"alpha = {C.ALPHA}")
+    ax.set_xscale("log"); ax.set_yscale("log")
+    ax.set_xlabel("sample size n"); ax.set_ylabel("p-value (log scale)"); ax.legend()
+    ax.set_title("p-value shrinks as sample size grows")
+    U.savefig(fig, C.FIG_DIR / "03_sample_size_pvalue.png")
 
 
 def main():
@@ -337,6 +487,10 @@ def main():
     h_paired(df)
     i_two_proportion(df)
     j_goodness_of_fit(df)
+    # --- bootstrap CI, inferential logit, sample-size sensitivity (synced from notebook) ---
+    k_bootstrap(df)
+    l_inferential_logit(df)
+    m_sample_size(df)
     log.save(C.RESULTS_DIR / "statistics_report.txt")
     print("\nSTEP 3 complete. Tables/figures saved; transcript in results/.")
 

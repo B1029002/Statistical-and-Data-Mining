@@ -81,3 +81,20 @@ H0: Air / Liquid / Oil & air each account for 1/3 of motorcycles.
 observed counts: {'Air': 18206, 'Liquid': 18223, 'Oil & air': 1781}
 chi-square (GoF) = 14135.6,  p = 0.00e+00
 -> the three cooling systems are NOT equally common (oil & air is rare).
+Liquid mean power 95% CI = [72.7, 77.1] HP
+Air    mean power 95% CI = [29.3, 31.1] HP
+-> non-overlapping CIs confirm the difference is robust (cf. test B).
+n = 2,255   Pseudo R^2 = 0.357
+                     coef  p_value  odds_ratio   or_lo    or_hi
+const             -1.4551   0.0000      0.2334  0.2032   0.2680
+displacement_ccm  -0.7244   0.0000      0.4846  0.3569   0.6580
+power_hp           1.9479   0.0000      7.0141  4.2806  11.4931
+compression_ratio  1.5368   0.0000      4.6495  3.8353   5.6364
+top_speed_kmh     -0.5099   0.0017      0.6006  0.4366   0.8260
+n =     50  ->  p = 1.36e-04
+n =    100  ->  p = 8.29e-06
+n =    300  ->  p = 2.19e-16
+n =   1000  ->  p = 1.91e-44
+n =   3000  ->  p = 7.43e-137
+n =   6633  ->  p = 1.65e-293
+-> p shrinks fast with n: at large n almost everything is 'significant'.

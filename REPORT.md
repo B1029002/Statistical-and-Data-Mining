@@ -84,11 +84,13 @@ A reproducible 4-stage pipeline (one script per stage; see `src/`):
         ├─ 03_statistics.py   ── normality, t-tests (1-sample / 2-sample / paired),
         │                        ANOVA+Tukey, Kruskal-Wallis, Mann-Whitney, Wilcoxon,
         │                        sign, 2-proportion z, correlation, χ² (independence +
-        │                        goodness-of-fit), OLS regression
+        │                        goodness-of-fit), OLS regression, bootstrap CI,
+        │                        inferential logit (odds ratios), sample-size sensitivity
         └─ 04_datamining.py   ── classification, clustering, association rules, PCA,
-                                 class-imbalance handling, leakage demo, predictive regression
+                                 class-imbalance handling, leakage demo, predictive regression,
+                                 decision tree, gradient boosting + voting ensemble, feature selection
         ▼
- figures/  (16 PNG)   results/  (21 tables + transcripts)
+ figures/  (29 PNG, one per test)   results/  (25 tables + transcripts)
 ```
 
 Everything is driven by a single config (`src/config.py`) and re-run with `bash run_all.sh`.
@@ -219,9 +221,14 @@ A further battery of tests, chosen by the *type* of data, rounds out the statist
 | H | **Paired t-test + Wilcoxon signed-rank + sign test** | Within an engine, bore ≠ stroke? | mean(bore−stroke) = **+8.03 mm**; all three *p* ≈ 0; 21,061/30,158 oversquare → engines are on average **oversquare** (high-revving) |
 | I | **Two-sample proportion z-test** | Injection share modern (≥2010) vs older? | **64.0 %** vs **22.7 %**, *z* = 34.3, *p* ≈ 4×10⁻²⁵⁸ → injection displaced carburettors |
 | J | **Chi-square goodness-of-fit** | Are the 3 cooling systems equally common? | χ² = 14,135.6, *p* ≈ 0 → **not** uniform (oil & air is rare) |
+| K | **Bootstrap 95% CI** | How precise is the mean-power estimate per cooling type? | Liquid [72.7, 77.1] vs Air [29.3, 31.1] HP — **non-overlapping** intervals (`figures/03_bootstrap_power.png`) |
+| L | **Inferential logistic regression** | Which specs raise the odds of being liquid-cooled? | Pseudo-R² = 0.36; odds ratios per +1 SD: power ×7, compression ×4.6 (push liquid), displacement/top-speed <1 (`figures/03_logit_oddsratio.png`) |
+| M | **Sample-size sensitivity** | How does the p-value move with n? | the same test's *p* falls from ~10⁻³ (n=100) to ~0 (full) — at large n almost everything is "significant", so report effect sizes (`figures/03_sample_size_pvalue.png`) |
 
-Test H is a neat illustration of the parametric → non-parametric → sign-test progression on a
-single, mechanically-meaningful comparison (`figures/03_bore_minus_stroke.png`).
+Every test above ships with a supporting figure (boxplot, histogram, Q-Q, scatter, heatmap, bar,
+bootstrap or forest plot) so each result can be shown visually, not just as a number. Test H is a
+neat illustration of the parametric → non-parametric → sign-test progression on a single,
+mechanically-meaningful comparison (`figures/03_bore_minus_stroke.png`).
 
 ---
 
@@ -272,7 +279,7 @@ that keeps every bike; `results/dm_association_rules.csv`). Highest-lift, interp
 These read like an engineer's design grammar: *big engine + belt + low seat* ⇒ cruiser;
 *small engine + belt* ⇒ scooter; *light + tall seat* ⇒ off-road.
 
-### 6.4–6.7 Additional data-mining techniques 進階資料採礦
+### 6.4–6.10 Additional data-mining techniques 進階資料採礦
 
 | # | Technique 技術 | Result |
 |---|---|---|
@@ -280,6 +287,12 @@ These read like an engineer's design grammar: *big engine + belt + low seat* ⇒
 | 6.5 | **Class-imbalance handling** — `class_weight='balanced'` | lifts the smallest class's recall (e.g. 0.61 → 0.66) for only a ~0.01 drop in overall macro-F1 — a transparent precision/recall trade-off (`results/dm_class_imbalance.csv`) |
 | 6.6 | **Data-leakage demonstration** — wrong vs right preprocessing | CV accuracy 0.5644 (preprocess on all data) vs 0.5629 (preprocess inside the pipeline); the small gap is honest for median imputation but would be large for feature selection / SMOTE / target encoding (`results/dm_leakage_demo.csv`) |
 | 6.7 | **Predictive regression** — Random-Forest top-speed model | held-out **RMSE = 17.6 km/h, MAE = 9.4 km/h, R² = 0.907** (`figures/04_topspeed_regression.png`) — a strong predictive complement to the inferential OLS model of §5 |
+| 6.8 | **Decision tree (depth 3)** — white-box, plotted | a readable tree (`figures/04_decision_tree.png`): the first split is **seat height**, then weight — interpretable but only ~0.50 accuracy, which is *why* the ensemble is needed |
+| 6.9 | **Gradient boosting + soft-voting ensemble** | HistGradientBoosting ≈ 0.79 and a RF+LR+GB voting ensemble ≈ 0.80 accuracy — on par with Random Forest (`results/dm_boosting_ensemble.csv`) |
+| 6.10 | **Feature selection** — top-K by RF importance | the top 5–8 features already reach near the full-feature macro-F1, so the model can be slimmed (`results/dm_feature_selection_topk.csv`) |
+
+Also added in EDA: categorical **pie charts** and **stacked proportion bars**
+(`figures/02_categorical_pies.png`, `figures/02_stacked_category_bars.png`).
 
 ---
 

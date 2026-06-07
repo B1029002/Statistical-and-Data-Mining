@@ -357,6 +357,84 @@ def predictive_regression(df_clean):
                  C.RESULTS_DIR / "dm_regression_metrics.csv", index=False)
 
 
+# =========================================================================== #
+# 8. DECISION TREE (a shallow, human-readable white-box model)
+# =========================================================================== #
+def decision_tree_viz(df):
+    U.section("8. DECISION TREE -- shallow, human-readable tree")
+    from sklearn.tree import DecisionTreeClassifier, plot_tree
+    feat = [c for c in C.MODEL_FEATURES if c in df.columns]
+    X, y = df[feat], df["category"]
+    X_tr, X_te, y_tr, y_te = train_test_split(
+        X, y, test_size=C.TEST_SIZE, stratify=y, random_state=C.RANDOM_STATE)
+    imp = SimpleImputer(strategy="median")
+    X_tr_i = imp.fit_transform(X_tr); X_te_i = imp.transform(X_te)
+    dt = DecisionTreeClassifier(max_depth=3, random_state=C.RANDOM_STATE).fit(X_tr_i, y_tr)
+    print(f"Depth-3 tree test accuracy = {accuracy_score(y_te, dt.predict(X_te_i)):.3f}")
+    fig, ax = plt.subplots(figsize=(22, 10))
+    plot_tree(dt, feature_names=feat, class_names=list(dt.classes_),
+              filled=True, rounded=True, fontsize=8, ax=ax)
+    ax.set_title("Decision Tree (depth=3) for motorcycle category")
+    U.savefig(fig, C.FIG_DIR / "04_decision_tree.png")
+
+
+# =========================================================================== #
+# 9. GRADIENT BOOSTING + VOTING ENSEMBLE
+# =========================================================================== #
+def boosting_ensemble(df):
+    U.section("9. GRADIENT BOOSTING + soft-voting ENSEMBLE")
+    from sklearn.ensemble import HistGradientBoostingClassifier, VotingClassifier
+    feat = [c for c in C.MODEL_FEATURES if c in df.columns]
+    X, y = df[feat], df["category"]
+    X_tr, X_te, y_tr, y_te = train_test_split(
+        X, y, test_size=C.TEST_SIZE, stratify=y, random_state=C.RANDOM_STATE)
+    gb = Pipeline([("imp", SimpleImputer(strategy="median")),
+                   ("clf", HistGradientBoostingClassifier(random_state=C.RANDOM_STATE))])
+    rf = Pipeline([("imp", SimpleImputer(strategy="median")),
+                   ("clf", RandomForestClassifier(n_estimators=400, n_jobs=-1,
+                                                  random_state=C.RANDOM_STATE))])
+    lr = Pipeline([("imp", SimpleImputer(strategy="median")), ("sc", StandardScaler()),
+                   ("clf", LogisticRegression(max_iter=2000, random_state=C.RANDOM_STATE))])
+    vote = VotingClassifier([("rf", rf), ("lr", lr), ("gb", gb)], voting="soft")
+    rows = []
+    for name, m in [("GradientBoosting", gb), ("VotingEnsemble", vote)]:
+        m.fit(X_tr, y_tr); pred = m.predict(X_te)
+        acc = accuracy_score(y_te, pred); f1m = f1_score(y_te, pred, average="macro")
+        rows.append([name, round(acc, 3), round(f1m, 3)])
+        print(f"  {name:16s} accuracy = {acc:.3f} | macro-F1 = {f1m:.3f}")
+    U.save_table(pd.DataFrame(rows, columns=["model", "test_accuracy", "test_macro_f1"]),
+                 C.RESULTS_DIR / "dm_boosting_ensemble.csv", index=False)
+    print("-> boosting/ensemble land on par with Random Forest (~0.80).")
+
+
+# =========================================================================== #
+# 10. FEATURE SELECTION -- keep top-K by RF importance, re-evaluate
+# =========================================================================== #
+def feature_selection_topk(df):
+    U.section("10. FEATURE SELECTION -- top-K by RF importance")
+    feat = [c for c in C.MODEL_FEATURES if c in df.columns]
+    X, y = df[feat], df["category"]
+    X_tr, X_te, y_tr, y_te = train_test_split(
+        X, y, test_size=C.TEST_SIZE, stratify=y, random_state=C.RANDOM_STATE)
+    base = Pipeline([("imp", SimpleImputer(strategy="median")),
+                     ("clf", RandomForestClassifier(n_estimators=400, n_jobs=-1,
+                                                    random_state=C.RANDOM_STATE))]).fit(X_tr, y_tr)
+    rank = pd.Series(base.named_steps["clf"].feature_importances_,
+                     index=feat).sort_values(ascending=False)
+    rows = []
+    for k in [5, 8, len(feat)]:
+        fk = rank.head(k).index.tolist()
+        m = Pipeline([("imp", SimpleImputer(strategy="median")),
+                      ("clf", RandomForestClassifier(n_estimators=400, n_jobs=-1,
+                                                     random_state=C.RANDOM_STATE))]).fit(X_tr[fk], y_tr)
+        f1m = f1_score(y_te, m.predict(X_te[fk]), average="macro")
+        rows.append([k, round(f1m, 3)])
+        print(f"  top-{k:>2} features: macro-F1 = {f1m:.3f}")
+    U.save_table(pd.DataFrame(rows, columns=["top_k_features", "macro_f1"]),
+                 C.RESULTS_DIR / "dm_feature_selection_topk.csv", index=False)
+    print("-> a handful of top features already approach full-feature performance.")
+
+
 def main():
     U.section("STEP 4  |  DATA MINING")
     if not C.MODEL_CSV.exists():
@@ -371,6 +449,9 @@ def main():
     class_imbalance(df)
     leakage_demo(df)
     predictive_regression(pd.read_csv(C.CLEAN_CSV))
+    decision_tree_viz(df)
+    boosting_ensemble(df)
+    feature_selection_topk(df)
     print("\nSTEP 4 complete. Models evaluated; figures/tables saved.")
 
 

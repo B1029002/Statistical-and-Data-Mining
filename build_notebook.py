@@ -333,6 +333,35 @@ fig.tight_layout()
 plt.show()
 """)
 
+code(r"""
+# ----- 2.6 類別分布圓餅圖(車種 / 冷卻 / 傳動) -----
+fig, axes = plt.subplots(1, 3, figsize=(20, 6))
+for ax, col, title in zip(axes, ["category", "cooling", "transmission"],
+                          ["Category", "Cooling", "Transmission"]):
+    vc = df[col].value_counts().head(8)            # 車種取前8大,其餘類別本來就少
+    ax.pie(vc.values, labels=vc.index, autopct="%1.1f%%", startangle=90,
+           textprops={"fontsize": 9})
+    ax.set_title(title)
+fig.suptitle("Categorical distributions", y=1.02)
+fig.tight_layout()
+plt.show()
+""")
+
+code(r"""
+# ----- 2.7 各車種內「傳動方式 / 冷卻方式」的比例(堆疊長條圖) -----
+# crosstab + normalize='index' -> 每個車種列加總為1,看組成比例
+top8 = df["category"].value_counts().head(8).index
+fig, axes = plt.subplots(1, 2, figsize=(20, 7))
+for ax, col in zip(axes, ["transmission", "cooling"]):
+    ct = pd.crosstab(df["category"], df[col], normalize="index").loc[top8]
+    ct.plot(kind="barh", stacked=True, ax=ax, colormap="viridis")
+    ax.set_title(f"{col.title()} share within each category")
+    ax.set_xlabel("Proportion")
+    ax.legend(title=col, bbox_to_anchor=(1.02, 1), loc="upper left")
+fig.tight_layout()
+plt.show()
+""")
+
 # --------------------------------------------------------------------------- #
 md(r"""
 ## 3. 統計方法 (Statistical Methods) — *對應指示 #3*
@@ -352,8 +381,18 @@ for c in ["power_hp","displacement_ccm","top_speed_kmh","dry_weight_kg"]:
     _, p  = stats.normaltest(xs)                  # 原始尺度的常態性
     _, pl = stats.normaltest(np.log(xs[xs > 0]))  # 取對數後的常態性
     rows.append([c, round(x.skew(), 2), f"{p:.1e}", round(np.log(x[x > 0]).skew(), 2), f"{pl:.1e}"])
-pd.DataFrame(rows, columns=["變數","偏態","p值(原始)","偏態(取log)","p值(取log)"])
+display(pd.DataFrame(rows, columns=["變數","偏態","p值(原始)","偏態(取log)","p值(取log)"]))
 # 結論：原始規格都不常態(右偏)，取對數後偏態接近 0 -> 後續對數尺度用有母數、原始尺度用無母數
+# 配圖:用 power_hp 看「原始 vs 取log」的直方圖與 Q-Q 圖,一眼看出非常態
+import statsmodels.api as sm
+x = df["power_hp"].dropna(); xl = np.log(x[x > 0])
+fig, ax = plt.subplots(2, 2, figsize=(13, 9))
+sns.histplot(x, bins=40, kde=True, ax=ax[0, 0], color="#4C72B0"); ax[0, 0].set_title("power_hp (raw)")
+sm.qqplot(x, line="s", ax=ax[0, 1], markersize=3, alpha=0.3); ax[0, 1].set_title("power_hp raw: Q-Q")
+sns.histplot(xl, bins=40, kde=True, ax=ax[1, 0], color="#55A868"); ax[1, 0].set_title("log(power_hp)")
+sm.qqplot(xl, line="s", ax=ax[1, 1], markersize=3, alpha=0.3); ax[1, 1].set_title("log(power_hp): Q-Q")
+fig.suptitle("Normality check: raw is skewed, log is closer to normal", y=1.01)
+fig.tight_layout(); plt.show()
 """)
 
 code(r"""
@@ -398,7 +437,17 @@ print(f"ANOVA F={F:.1f}(p={pf:.1e}) | Kruskal H={H:.0f}(p={ph:.1e}) | eta^2={eta
 tuk = pairwise_tukeyhsd(s.lp, s.category, alpha=ALPHA)
 td = pd.DataFrame(tuk.summary().data[1:], columns=tuk.summary().data[0])
 print("Tukey 事後比較：%d/%d 個車種配對有顯著差異" % (td.reject.astype(str).eq('True').sum(), len(td)))
-td.head(8)                                        # 顯示前 8 個配對
+display(td.head(8))                                # 顯示前 8 個配對
+# 配圖:各車種馬力箱型圖(ANOVA / Kruskal 的視覺佐證)
+order = s.groupby("category")["power_hp"].median().sort_values(ascending=False).index
+fig, ax = plt.subplots(figsize=(13, 6))
+sns.boxplot(data=s, x="category", y="power_hp", order=order, showfliers=False,
+            hue="category", palette="viridis", legend=False, ax=ax)
+ax.set_title("Power by category (ANOVA / Kruskal-Wallis)"); ax.set_ylabel("Power (HP)")
+ax.set_xlabel(""); ax.tick_params(axis="x", rotation=35)
+for lbl in ax.get_xticklabels():
+    lbl.set_ha("right")
+plt.show()
 """)
 
 code(r"""
@@ -414,7 +463,15 @@ for a, b in pairs:
     r, _   = stats.pearsonr(z[a], z[b])        # Pearson(線性相關)
     rho, _ = stats.spearmanr(z[a], z[b])       # Spearman(單調相關)
     out.append([f"{a} ~ {b}", len(z), round(r, 3), round(rho, 3)])
-pd.DataFrame(out, columns=["變數配對","n","Pearson r","Spearman rho"])
+display(pd.DataFrame(out, columns=["變數配對","n","Pearson r","Spearman rho"]))
+# 配圖:兩組代表性散佈圖 + 迴歸線(標 Pearson r)
+fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+for ax, (xa, xb) in zip(axes, [("displacement_ccm", "power_hp"), ("power_hp", "top_speed_kmh")]):
+    zz = df[[xa, xb]].dropna(); zz = zz.sample(min(3000, len(zz)), random_state=RANDOM_STATE)
+    rr = stats.pearsonr(zz[xa], zz[xb])[0]
+    sns.regplot(data=zz, x=xa, y=xb, ax=ax, scatter_kws={"s": 8, "alpha": 0.2}, line_kws={"color": "red"})
+    ax.set_title(f"{xa} ~ {xb}  (Pearson r = {rr:.2f})")
+fig.tight_layout(); plt.show()
 """)
 
 code(r"""
@@ -430,7 +487,12 @@ phi2 = max(0, chi2/n - (k-1)*(r-1)/(n-1))
 V = np.sqrt(phi2 / min(k-1, r-1))
 print(f"chi2={chi2:.1f}, 自由度={dof}, p={p:.2e} | Cramer's V={V:.3f}(顯著但關聯很弱)")
 print("教學重點：樣本很大時，p 值會很顯著，但效應量(V)才告訴你關聯實際上有多強。")
-ct                                             # 顯示列聯表
+display(ct)                                     # 顯示列聯表
+# 配圖:列聯表熱圖(卡方檢定的視覺佐證)
+fig, ax = plt.subplots(figsize=(7, 5))
+sns.heatmap(ct, annot=True, fmt="d", cmap="Blues", ax=ax)
+ax.set_title("Cooling x transmission (observed counts)")
+plt.show()
 """)
 
 code(r"""
@@ -634,6 +696,14 @@ ci = stats.t.interval(0.95, len(r)-1, loc=r.mean(), scale=stats.sem(r))  # 平�
 print(f"n={len(r)}, 平均評分={r.mean():.3f}")
 print(f"單樣本 t={t1:.1f}, p={p1:.2e}, 95%CI=({ci[0]:.3f}, {ci[1]:.3f})")
 print("結論：平均評分顯著高於 3.0 -> 使用者整體評價偏正面。")
+# 配圖:評分分布 + 檢定值3.0(黑虛線) + 平均(紅線) + 95%CI(紅色區帶)
+fig, ax = plt.subplots(figsize=(9, 5))
+sns.histplot(r, bins=30, kde=True, ax=ax, color="#4C72B0")
+ax.axvline(3.0, color="black", ls="--", label="test value 3.0")
+ax.axvline(r.mean(), color="red", label=f"mean {r.mean():.2f}")
+ax.axvspan(ci[0], ci[1], color="red", alpha=0.15, label="95% CI of mean")
+ax.set_title("One-sample t-test: rating vs neutral 3.0"); ax.set_xlabel("rating"); ax.legend()
+plt.show()
 """)
 
 code(r"""
@@ -667,6 +737,13 @@ nobs   = [len(modern), len(older)]
 z, pz = proportions_ztest(counts, nobs)                    # 雙樣本比例 z 檢定
 print(f"新世代噴射比例={counts[0]/nobs[0]:.1%} (n={nobs[0]}) | 舊世代={counts[1]/nobs[1]:.1%} (n={nobs[1]})")
 print(f"z={z:.1f}, p={pz:.2e} -> 噴射在新世代顯著普及。")
+# 配圖:兩世代的噴射比例長條
+fig, ax = plt.subplots(figsize=(7, 5))
+shares = [counts[0]/nobs[0]*100, counts[1]/nobs[1]*100]
+bars = ax.bar(["modern (>=2010)", "older (<2010)"], shares, color=["#4C72B0", "#C44E52"])
+ax.bar_label(bars, fmt="%.1f%%"); ax.set_ylabel("% fuel injection")
+ax.set_title("Injection adoption by era (two-proportion z-test)")
+plt.show()
 """)
 
 code(r"""
@@ -677,6 +754,93 @@ exp = [obs.sum()/len(obs)] * len(obs)                      # 期望次數(均勻
 chi, pg = stats.chisquare(obs.values, exp)                 # 卡方適合度檢定
 print("觀察次數:", dict(obs))
 print(f"chi2={chi:.1f}, p={pg:.2e} -> 三種冷卻方式分布顯著不均(氣冷與水冷遠多於油冷)。")
+# 配圖:觀察次數 vs 期望次數(均勻)長條
+fig, ax = plt.subplots(figsize=(7, 5))
+xpos = np.arange(len(obs))
+ax.bar(xpos - 0.2, obs.values, 0.4, label="observed", color="#4C72B0")
+ax.bar(xpos + 0.2, exp, 0.4, label="expected (uniform)", color="#C44E52")
+ax.set_xticks(xpos); ax.set_xticklabels(obs.index); ax.set_ylabel("count"); ax.legend()
+ax.set_title("Cooling: observed vs expected (chi-square goodness-of-fit)")
+plt.show()
+""")
+
+code(r"""
+# ----- 5.5 Bootstrap 95% 信賴區間:水冷 vs 氣冷 的平均馬力 -----
+# 不假設分布,直接從資料「重抽(可重複)」1000次算平均,取2.5%~97.5%分位數當95% CI
+import numpy as np
+rng = np.random.default_rng(RANDOM_STATE)
+def boot_means(x, n=1000):
+    x = np.asarray(x)
+    return np.array([rng.choice(x, size=len(x), replace=True).mean() for _ in range(n)])
+liq = df.loc[df.cooling == "Liquid", "power_hp"].dropna().values
+air = df.loc[df.cooling == "Air",    "power_hp"].dropna().values
+bl, ba = boot_means(liq), boot_means(air)
+ci_l = np.percentile(bl, [2.5, 97.5]); ci_a = np.percentile(ba, [2.5, 97.5])
+print(f"水冷 平均馬力 95%CI = [{ci_l[0]:.1f}, {ci_l[1]:.1f}] HP")
+print(f"氣冷 平均馬力 95%CI = [{ci_a[0]:.1f}, {ci_a[1]:.1f}] HP")
+print("兩區間完全不重疊 -> 平均馬力差異穩健(呼應 3.B 的 t 檢定)")
+fig, ax = plt.subplots(1, 2, figsize=(15, 5))
+for a, (bs, ci, name, c) in zip(ax, [(bl, ci_l, "Liquid", "#4C72B0"), (ba, ci_a, "Air", "#C44E52")]):
+    a.hist(bs, bins=30, color=c)
+    a.axvline(ci[0], color="red", ls="--"); a.axvline(ci[1], color="red", ls="--")
+    a.set_title(f"Bootstrap mean power: {name}"); a.set_xlabel("Mean power (HP)")
+fig.tight_layout(); plt.show()
+""")
+
+code(r"""
+# ----- 5.6 推論型邏輯迴歸:用規格預測「是否水冷」,解讀 odds ratio(勝算比) -----
+import statsmodels.api as sm
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+sub = df.dropna(subset=["cooling", "displacement_ccm", "power_hp", "compression_ratio", "top_speed_kmh"]).copy()
+sub = sub[sub.cooling.isin(["Liquid", "Air"])]
+sub["is_liquid"] = (sub.cooling == "Liquid").astype(int)    # 目標:1=水冷, 0=氣冷
+feats = ["displacement_ccm", "power_hp", "compression_ratio", "top_speed_kmh"]
+# 把特徵標準化(z分數),這樣 odds ratio = 「該規格每增加1個標準差」對水冷勝算的倍數,便於比較
+Xz = pd.DataFrame(StandardScaler().fit_transform(sub[feats]), columns=feats, index=sub.index)
+Xz = sm.add_constant(Xz)
+logit = sm.Logit(sub["is_liquid"], Xz).fit(disp=False)
+res = pd.DataFrame({"coef": logit.params, "p_value": logit.pvalues, "odds_ratio": np.exp(logit.params)})
+print(f"n={int(logit.nobs)}, Pseudo R^2={logit.prsquared:.3f}")
+display(res.round(4))
+print("odds_ratio>1:該規格越大越可能水冷;<1則越可能氣冷(壓縮比、極速的勝算比最高)")
+# 配圖:odds ratio 森林圖(含95%CI,紅色虛線=1 代表無影響)
+cint = logit.conf_int(); res["or_lo"] = np.exp(cint[0]); res["or_hi"] = np.exp(cint[1])
+r2 = res.drop(index="const")
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.errorbar(r2["odds_ratio"], range(len(r2)),
+            xerr=[r2["odds_ratio"] - r2["or_lo"], r2["or_hi"] - r2["odds_ratio"]],
+            fmt="o", color="#4C72B0", capsize=4)
+ax.axvline(1.0, color="red", ls="--")
+ax.set_yticks(range(len(r2))); ax.set_yticklabels(r2.index)
+ax.set_xlabel("Odds ratio (per +1 SD)"); ax.set_title("P(liquid-cooled): odds ratios with 95% CI")
+plt.show()
+""")
+
+code(r"""
+# ----- 5.7 樣本數敏感度:同一檢定在 n=100/300/1000/全量 下的 p 值變化 -----
+# 用「水冷vs氣冷馬力」的 Mann-Whitney,展示『大樣本下 p 值幾乎必然很小』->要看效應量而非只看 p
+from scipy import stats
+full = df.dropna(subset=["power_hp", "cooling"])
+full = full[full.cooling.isin(["Liquid", "Air"])]
+rows = []
+for n in [100, 300, 1000, len(full)]:
+    s = full.sample(min(n, len(full)), random_state=RANDOM_STATE)
+    l = s.loc[s.cooling == "Liquid", "power_hp"]; a = s.loc[s.cooling == "Air", "power_hp"]
+    if len(l) > 5 and len(a) > 5:
+        _, p = stats.mannwhitneyu(l, a, alternative="two-sided")
+        rows.append([n, len(l), len(a), f"{p:.2e}"])
+display(pd.DataFrame(rows, columns=["sample_n", "n_liquid", "n_air", "p_value"]))
+print("樣本越大 p 值越小 -> 大數據下幾乎必然顯著,故應同時看效應量(如 Cohen's d)")
+# 配圖:p 值(log軸) vs 樣本數,並畫 alpha=0.05 參考線
+ns = [r[0] for r in rows]; ps = [float(r[3]) for r in rows]
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.plot(ns, ps, "o-", color="#4C72B0")
+ax.axhline(ALPHA, color="red", ls="--", label=f"alpha = {ALPHA}")
+ax.set_xscale("log"); ax.set_yscale("log")
+ax.set_xlabel("sample size n"); ax.set_ylabel("p-value (log scale)"); ax.legend()
+ax.set_title("p-value shrinks as sample size grows")
+plt.show()
 """)
 
 # --------------------------------------------------------------------------- #
@@ -768,6 +932,65 @@ print("RMSE>=MAE(因為平方放大大誤差);兩者越小代表預測越準。"
 plt.scatter(yrte, pred, s=8, alpha=.3)
 lims = [yrte.min(), yrte.max()]; plt.plot(lims, lims, "r--")   # 紅線=完美預測
 plt.xlabel("Actual top speed (km/h)"); plt.ylabel("Predicted top speed (km/h)"); plt.title(f"Top speed prediction (R2={r2:.2f})"); plt.show()
+""")
+
+code(r"""
+# ----- 6.5 決策樹視覺化:訓練一棵淺層樹並畫出來(可解讀的白盒模型) -----
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import accuracy_score
+imp = SimpleImputer(strategy="median")
+Xtr_i = imp.fit_transform(Xtr); Xte_i = imp.transform(Xte)   # Xtr/Xte/ytr/yte 來自 4.1
+dt = DecisionTreeClassifier(max_depth=3, random_state=RANDOM_STATE).fit(Xtr_i, ytr)
+print(f"淺層決策樹(深度3) 測試準確率={accuracy_score(yte, dt.predict(Xte_i)):.3f} (對照 RF≈0.80)")
+fig, ax = plt.subplots(figsize=(22, 10))
+plot_tree(dt, feature_names=MODEL_FEATURES, class_names=list(dt.classes_),
+          filled=True, rounded=True, fontsize=8, ax=ax)
+ax.set_title("Decision Tree (depth=3) for motorcycle category")
+plt.show()
+""")
+
+code(r"""
+# ----- 6.6 梯度提升 + 模型集成(Voting):和 RF / LR 比較 -----
+from sklearn.ensemble import HistGradientBoostingClassifier, VotingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, f1_score
+gb = Pipeline([("imp", SimpleImputer(strategy="median")),
+               ("clf", HistGradientBoostingClassifier(random_state=RANDOM_STATE))])
+rf = Pipeline([("imp", SimpleImputer(strategy="median")),
+               ("clf", RandomForestClassifier(n_estimators=400, random_state=RANDOM_STATE, n_jobs=-1))])
+lr = Pipeline([("imp", SimpleImputer(strategy="median")), ("sc", StandardScaler()),
+               ("clf", LogisticRegression(max_iter=2000, random_state=RANDOM_STATE))])
+# soft voting:用三個模型的平均機率投票
+vote = VotingClassifier([("rf", rf), ("lr", lr), ("gb", gb)], voting="soft")
+for name, m in [("GradientBoosting", gb), ("Voting集成", vote)]:
+    m.fit(Xtr, ytr); pr = m.predict(Xte)
+    print(f"{name:16s} 測試準確率={accuracy_score(yte, pr):.3f} | macro-F1={f1_score(yte, pr, average='macro'):.3f}")
+print("(對照 4.1:RF acc≈0.80, LR acc≈0.57)")
+""")
+
+code(r"""
+# ----- 6.7 特徵選擇:用 RF 重要度選前 K 個特徵重訓,看分數變化 -----
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import f1_score
+base = Pipeline([("imp", SimpleImputer(strategy="median")),
+                 ("clf", RandomForestClassifier(n_estimators=400, random_state=RANDOM_STATE, n_jobs=-1))]).fit(Xtr, ytr)
+imp_rank = pd.Series(base.named_steps["clf"].feature_importances_,
+                     index=MODEL_FEATURES).sort_values(ascending=False)
+rows = []
+for k in [5, 8, 13]:
+    fk = imp_rank.head(k).index.tolist()
+    m = Pipeline([("imp", SimpleImputer(strategy="median")),
+                  ("clf", RandomForestClassifier(n_estimators=400, random_state=RANDOM_STATE, n_jobs=-1))]
+                 ).fit(Xtr[fk], ytr)
+    rows.append([k, round(f1_score(yte, m.predict(Xte[fk]), average="macro"), 3)])
+display(pd.DataFrame(rows, columns=["top_k_features", "macro_f1"]))
+print("用最重要的前幾個特徵就能逼近全特徵表現 -> 模型可精簡")
 """)
 
 # --------------------------------------------------------------------------- #
