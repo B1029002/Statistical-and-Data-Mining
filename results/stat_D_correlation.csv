@@ -1,0 +1,6 @@
+pair,n,pearson_r,p_pearson,spearman_rho,p_spearman
+displacement_ccm ~ power_hp,7393,0.8040,0.00e+00,0.9240,0.00e+00
+power_hp ~ top_speed_kmh,3583,0.8930,0.00e+00,0.9480,0.00e+00
+dry_weight_kg ~ top_speed_kmh,7007,0.5090,0.00e+00,0.7620,0.00e+00
+displacement_ccm ~ torque_nm,9365,0.9680,0.00e+00,0.9780,0.00e+00
+compression_ratio ~ power_weight_ratio,9086,0.6180,0.00e+00,0.6180,0.00e+00

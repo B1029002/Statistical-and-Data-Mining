@@ -1,0 +1,56 @@
+group1,group2,meandiff,p-adj,lower,upper,reject
+ATV,Allround,0.0067,1.0000,-0.2565,0.2698,False
+ATV,Classic,0.4457,0.0000,0.1778,0.7137,True
+ATV,Custom / cruiser,0.6821,0.0000,0.4160,0.9482,True
+ATV,Enduro / offroad,0.0484,1.0000,-0.2169,0.3137,False
+ATV,Naked bike,0.8779,0.0000,0.6173,1.1385,True
+ATV,Scooter,-1.0116,0.0000,-1.2641,-0.7591,True
+ATV,Sport,0.5651,0.0000,0.3119,0.8182,True
+ATV,Sport touring,1.1959,0.0000,0.9159,1.4759,True
+ATV,Super motard,0.3283,0.0221,0.0240,0.6325,True
+ATV,Touring,0.9585,0.0000,0.6763,1.2407,True
+Allround,Classic,0.4391,0.0000,0.2787,0.5995,True
+Allround,Custom / cruiser,0.6755,0.0000,0.5182,0.8328,True
+Allround,Enduro / offroad,0.0418,0.9988,-0.1142,0.1977,False
+Allround,Naked bike,0.8712,0.0000,0.7234,1.0191,True
+Allround,Scooter,-1.0182,0.0000,-1.1512,-0.8853,True
+Allround,Sport,0.5584,0.0000,0.4242,0.6926,True
+Allround,Sport touring,1.1893,0.0000,1.0094,1.3691,True
+Allround,Super motard,0.3216,0.0001,0.1060,0.5373,True
+Allround,Touring,0.9518,0.0000,0.7686,1.1350,True
+Classic,Custom / cruiser,0.2364,0.0002,0.0711,0.4016,True
+Classic,Enduro / offroad,-0.3973,0.0000,-0.5613,-0.2334,True
+Classic,Naked bike,0.4321,0.0000,0.2759,0.5884,True
+Classic,Scooter,-1.4573,0.0000,-1.5996,-1.3150,True
+Classic,Sport,0.1193,0.2099,-0.0241,0.2628,False
+Classic,Sport touring,0.7502,0.0000,0.5634,0.9370,True
+Classic,Super motard,-0.1175,0.8321,-0.3390,0.1040,False
+Classic,Touring,0.5127,0.0000,0.3227,0.7028,True
+Custom / cruiser,Enduro / offroad,-0.6337,0.0000,-0.7947,-0.4728,True
+Custom / cruiser,Naked bike,0.1958,0.0019,0.0426,0.3489,True
+Custom / cruiser,Scooter,-1.6937,0.0000,-1.8326,-1.5549,True
+Custom / cruiser,Sport,-0.1171,0.2035,-0.2571,0.0229,False
+Custom / cruiser,Sport touring,0.5138,0.0000,0.3296,0.6980,True
+Custom / cruiser,Super motard,-0.3539,0.0000,-0.5732,-0.1345,True
+Custom / cruiser,Touring,0.2764,0.0001,0.0889,0.4638,True
+Enduro / offroad,Naked bike,0.8295,0.0000,0.6777,0.9812,True
+Enduro / offroad,Scooter,-1.0600,0.0000,-1.1973,-0.9227,True
+Enduro / offroad,Sport,0.5166,0.0000,0.3782,0.6551,True
+Enduro / offroad,Sport touring,1.1475,0.0000,0.9645,1.3306,True
+Enduro / offroad,Super motard,0.2799,0.0018,0.0615,0.4982,True
+Enduro / offroad,Touring,0.9101,0.0000,0.7237,1.0964,True
+Naked bike,Scooter,-1.8895,0.0000,-2.0175,-1.7615,True
+Naked bike,Sport,-0.3128,0.0000,-0.4421,-0.1835,True
+Naked bike,Sport touring,0.3180,0.0000,0.1419,0.4942,True
+Naked bike,Super motard,-0.5496,0.0000,-0.7622,-0.3370,True
+Naked bike,Touring,0.0806,0.9370,-0.0990,0.2602,False
+Scooter,Sport,1.5767,0.0000,1.4647,1.6886,True
+Scooter,Sport touring,2.2075,0.0000,2.0436,2.3714,True
+Scooter,Super motard,1.3399,0.0000,1.1373,1.5424,True
+Scooter,Touring,1.9701,0.0000,1.8025,2.1377,True
+Sport,Sport touring,0.6309,0.0000,0.4659,0.7958,True
+Sport,Super motard,-0.2368,0.0083,-0.4402,-0.0334,True
+Sport,Touring,0.3934,0.0000,0.2248,0.5620,True
+Sport touring,Super motard,-0.8677,0.0000,-1.1037,-0.6317,True
+Sport touring,Touring,-0.2374,0.0100,-0.4442,-0.0307,True
+Super motard,Touring,0.6302,0.0000,0.3916,0.8688,True

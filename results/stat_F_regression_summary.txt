@@ -1,0 +1,62 @@
+MODEL A: log(top_speed) ~ log(power) + log(weight)
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                   ltop   R-squared:                       0.893
+Model:                            OLS   Adj. R-squared:                  0.893
+Method:                 Least Squares   F-statistic:                     6897.
+Date:                Mon, 08 Jun 2026   Prob (F-statistic):               0.00
+Time:                        00:19:57   Log-Likelihood:                 638.39
+No. Observations:                1648   AIC:                            -1271.
+Df Residuals:                    1645   BIC:                            -1255.
+Df Model:                           2                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+Intercept      4.0195      0.060     66.822      0.000       3.902       4.137
+lpow           0.4269      0.005     83.153      0.000       0.417       0.437
+lwt           -0.1096      0.014     -7.701      0.000      -0.138      -0.082
+==============================================================================
+Omnibus:                      608.509   Durbin-Watson:                   1.741
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):             7007.952
+Skew:                          -1.390   Prob(JB):                         0.00
+Kurtosis:                      12.712   Cond. No.                         91.6
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+
+
+MODEL B: top_speed ~ power + weight + displacement + fuel_cap + cooling
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:          top_speed_kmh   R-squared:                       0.864
+Model:                            OLS   Adj. R-squared:                  0.863
+Method:                 Least Squares   F-statistic:                     1134.
+Date:                Mon, 08 Jun 2026   Prob (F-statistic):               0.00
+Time:                        00:19:57   Log-Likelihood:                -4966.0
+No. Observations:                1081   AIC:                             9946.
+Df Residuals:                    1074   BIC:                             9981.
+Df Model:                           6                                         
+Covariance Type:            nonrobust                                         
+========================================================================================
+                           coef    std err          t      P>|t|      [0.025      0.975]
+----------------------------------------------------------------------------------------
+Intercept               82.6981      1.994     41.480      0.000      78.786      86.610
+cooling[T.Liquid]       12.8696      1.891      6.804      0.000       9.158      16.581
+cooling[T.Oil & air]    11.6165      3.095      3.753      0.000       5.544      17.689
+power_hp                 0.8762      0.031     28.522      0.000       0.816       0.937
+dry_weight_kg           -0.1922      0.017    -11.164      0.000      -0.226      -0.158
+displacement_ccm         0.0364      0.004      8.941      0.000       0.028       0.044
+fuel_capacity_l          1.9639      0.211      9.290      0.000       1.549       2.379
+==============================================================================
+Omnibus:                       87.538   Durbin-Watson:                   1.686
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              142.669
+Skew:                          -0.586   Prob(JB):                     1.05e-31
+Kurtosis:                       4.339   Cond. No.                     2.88e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 2.88e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.

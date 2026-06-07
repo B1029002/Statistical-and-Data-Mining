@@ -1,0 +1,21 @@
+antecedents,consequents,support,confidence,lift
+"displacement_ccm=High, transmission=Belt",category=Custom / cruiser,0.0604,0.8634,6.1132
+"displacement_ccm=High, seat_height_mm=Low",category=Custom / cruiser,0.0913,0.7804,5.5256
+"dry_weight_kg=High, transmission=Belt",category=Custom / cruiser,0.0607,0.7425,5.2576
+"dry_weight_kg=High, seat_height_mm=Low",category=Custom / cruiser,0.0973,0.7415,5.2501
+"fuel_capacity_l=High, seat_height_mm=Low",category=Custom / cruiser,0.0586,0.7177,5.0815
+"dry_weight_kg=Low, seat_height_mm=High",category=Enduro / offroad,0.0749,0.7444,4.8845
+"displacement_ccm=Med, seat_height_mm=High",category=Enduro / offroad,0.0685,0.7326,4.8069
+"fuel_capacity_l=Low, seat_height_mm=High",category=Enduro / offroad,0.0571,0.6779,4.4481
+"cooling=Liquid, dry_weight_kg=Low",category=Enduro / offroad,0.0705,0.6529,4.2837
+"displacement_ccm=Low, transmission=Belt",category=Scooter,0.0999,0.9781,4.1873
+"fuel_capacity_l=Low, transmission=Belt",category=Scooter,0.1020,0.9710,4.1568
+"fuel_system=Carburettor, seat_height_mm=High",category=Enduro / offroad,0.0553,0.6267,4.1122
+"dry_weight_kg=Low, transmission=Belt",category=Scooter,0.0869,0.9585,4.1034
+"displacement_ccm=Med, dry_weight_kg=Low",category=Enduro / offroad,0.0607,0.6206,4.0718
+"category=Enduro / offroad, cooling=Liquid",seat_height_mm=High,0.0831,0.8665,3.9704
+"category=Enduro / offroad, displacement_ccm=Med",seat_height_mm=High,0.0685,0.8230,3.7707
+"category=Custom / cruiser, transmission=Belt",seat_height_mm=Low,0.0565,0.9041,3.5806
+"category=Enduro / offroad, fuel_capacity_l=Low",seat_height_mm=High,0.0571,0.7784,3.5665
+"category=Custom / cruiser, fuel_capacity_l=High",seat_height_mm=Low,0.0586,0.8850,3.5050
+"category=Enduro / offroad, dry_weight_kg=Low",seat_height_mm=High,0.0749,0.7614,3.4885

@@ -1,0 +1,5 @@
+variable,skew,K2,p_value,skew_log,p_value_log
+power_hp,1.5110,1427.3000,1.19e-310,-0.3270,3.94e-61
+displacement_ccm,1.1140,729.7000,3.61e-159,-0.2580,1.90e-281
+top_speed_kmh,0.5470,150.8000,1.84e-33,-0.7450,2.94e-100
+dry_weight_kg,1.5650,1581.8000,0.00e+00,-0.1180,5.14e-05

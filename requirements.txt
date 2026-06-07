@@ -1,0 +1,10 @@
+# Python 3.11  (conda env: data_mining)
+# Generated for CE5033 Final Project -- exact versions used in this analysis
+pandas==3.0.3
+numpy==2.4.6
+scikit-learn==1.9.0
+scipy==1.17.1
+matplotlib==3.10.9
+seaborn==0.13.2
+statsmodels==0.14.6
+mlxtend==0.25.0

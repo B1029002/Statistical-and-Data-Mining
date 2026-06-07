@@ -1,0 +1,14 @@
+,PC1,PC2
+displacement_ccm,0.4050,-0.1060
+power_hp,0.2500,0.3270
+torque_nm,0.3590,0.0460
+top_speed_kmh,0.1850,0.2610
+dry_weight_kg,0.3540,-0.2070
+fuel_capacity_l,0.3170,-0.0040
+seat_height_mm,-0.1030,0.3380
+wheelbase_mm,0.2820,-0.1950
+bore_mm,0.3410,-0.0700
+stroke_mm,0.2770,-0.3580
+compression_ratio,0.1220,0.4030
+power_weight_ratio,0.2880,0.3840
+power_rpm,0.0580,0.4170

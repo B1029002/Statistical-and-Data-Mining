@@ -1,0 +1,345 @@
+"""
+03_statistics.py
+================
+Step 3 of the pipeline -- STATISTICAL METHODS (Instruction #3).
+
+A self-contained statistical study of the cleaned data.  Every test prints its
+hypotheses, statistic, p-value, an effect size and a plain-English conclusion,
+and the whole transcript is also written to results/statistics_report.txt.
+
+Contents
+--------
+A. Normality assessment (D'Agostino K^2) -> justifies parametric vs non-parametric
+B. Two-group test  : power of Liquid- vs Air-cooled engines
+                     (Welch t-test + Mann-Whitney U + Cohen's d)
+C. k-group test    : power across motorcycle categories
+                     (one-way ANOVA on log-power + Kruskal-Wallis + Tukey HSD)
+D. Correlation     : Pearson & Spearman with p-values for key spec pairs
+E. Independence    : chi-square test  (cooling x transmission) + Cramer's V
+F. Regression      : OLS  log(top_speed) ~ log(power)+log(weight)  (physics check)
+                     + a richer multivariable model with VIF & residual diagnostics
+
+Run (after 01):  python 03_statistics.py
+"""
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.proportion import proportions_ztest
+
+import config as C
+import bikez_utils as U
+
+
+# --------------------------------------------------------------------------- #
+# tiny logger: echo to console AND collect into a report file
+# --------------------------------------------------------------------------- #
+class Log:
+    def __init__(self):
+        self.lines = []
+
+    def __call__(self, *args):
+        msg = " ".join(str(a) for a in args)
+        print(msg)
+        self.lines.append(msg)
+
+    def save(self, path):
+        path.write_text("\n".join(self.lines), encoding="utf-8")
+        print(f"\n[report] full transcript -> {path.name}")
+
+
+log = Log()
+
+
+def cohens_d(a, b):
+    """Cohen's d for two independent samples (pooled SD)."""
+    a, b = np.asarray(a), np.asarray(b)
+    na, nb = len(a), len(b)
+    sp = np.sqrt(((na - 1) * a.std(ddof=1) ** 2 + (nb - 1) * b.std(ddof=1) ** 2)
+                 / (na + nb - 2))
+    return (a.mean() - b.mean()) / sp
+
+
+def cramers_v(confusion):
+    """Bias-corrected Cramer's V for a contingency table."""
+    chi2 = stats.chi2_contingency(confusion)[0]
+    n = confusion.sum().sum()
+    r, k = confusion.shape
+    phi2 = chi2 / n
+    phi2corr = max(0, phi2 - (k - 1) * (r - 1) / (n - 1))
+    rcorr = r - ((r - 1) ** 2) / (n - 1)
+    kcorr = k - ((k - 1) ** 2) / (n - 1)
+    return np.sqrt(phi2corr / max(1e-12, min(kcorr - 1, rcorr - 1)))
+
+
+# --------------------------------------------------------------------------- #
+def a_normality(df):
+    U.section("A. Normality assessment (D'Agostino-Pearson K^2)")
+    log("H0: the variable is drawn from a normal distribution.")
+    rows = []
+    for c in ["power_hp", "displacement_ccm", "top_speed_kmh", "dry_weight_kg"]:
+        x = df[c].dropna()
+        # work on a capped sample so the test is not absurdly over-powered
+        xs = x.sample(min(5000, len(x)), random_state=C.RANDOM_STATE)
+        k2, p = stats.normaltest(xs)
+        k2l, pl = stats.normaltest(np.log(xs[xs > 0]))
+        rows.append([c, round(x.skew(), 3), round(k2, 1), f"{p:.2e}",
+                     round(np.log(x[x > 0]).skew(), 3), f"{pl:.2e}"])
+    tab = pd.DataFrame(rows, columns=["variable", "skew", "K2", "p_value",
+                                      "skew_log", "p_value_log"])
+    log(tab.to_string(index=False))
+    log("\n-> All p-values << 0.05: raw specs are right-skewed and NON-normal.")
+    log("   Log-transformation greatly reduces skew, so we pair parametric tests")
+    log("   (on log scale) with non-parametric tests on the raw scale.")
+    U.save_table(tab, C.RESULTS_DIR / "stat_A_normality.csv", index=False)
+
+
+def b_two_group(df):
+    U.section("B. Two-group comparison -- power: Liquid- vs Air-cooled")
+    sub = df.dropna(subset=["power_hp", "cooling"])
+    liq = sub.loc[sub["cooling"] == "Liquid", "power_hp"]
+    air = sub.loc[sub["cooling"] == "Air", "power_hp"]
+    log(f"n(Liquid) = {len(liq):,}   mean = {liq.mean():.1f} HP   median = {liq.median():.1f}")
+    log(f"n(Air)    = {len(air):,}   mean = {air.mean():.1f} HP   median = {air.median():.1f}")
+
+    log("\nH0: mean power is equal for Liquid- and Air-cooled engines.")
+    t, p = stats.ttest_ind(liq, air, equal_var=False)          # Welch
+    log(f"Welch t-test         : t = {t:.2f},  p = {p:.3e}")
+    u, pu = stats.mannwhitneyu(liq, air, alternative="two-sided")
+    log(f"Mann-Whitney U       : U = {u:.0f},  p = {pu:.3e}")
+    d = cohens_d(liq, air)
+    log(f"Cohen's d            : {d:.2f}  ({'large' if abs(d)>=0.8 else 'medium' if abs(d)>=0.5 else 'small'} effect)")
+    log(f"-> p < {C.ALPHA}: liquid-cooled engines produce significantly MORE power.")
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.boxplot(data=sub[sub.cooling.isin(["Air", "Liquid", "Oil & air"])],
+                x="cooling", y="power_hp", showfliers=False, ax=ax,
+                hue="cooling", palette="Set2", legend=False)
+    ax.set_title("Power by cooling system"); ax.set_ylabel("Power (HP)")
+    U.savefig(fig, C.FIG_DIR / "03_power_by_cooling.png")
+
+
+def c_kgroup(df):
+    U.section("C. k-group comparison -- power across categories")
+    sub = df.dropna(subset=["power_hp", "category"]).copy()
+    keep = sub["category"].value_counts()
+    keep = keep[keep >= 100].index
+    sub = sub[sub["category"].isin(keep)].copy()
+    sub["log_power"] = np.log(sub["power_hp"])
+    groups = [g["power_hp"].values for _, g in sub.groupby("category")]
+    log(f"Categories compared (n>=100): {list(keep)}")
+
+    log("\nH0: all categories share the same mean/median power.")
+    F, p = stats.f_oneway(*[np.log(g) for g in groups])
+    log(f"One-way ANOVA (log power): F = {F:.1f},  p = {p:.3e}")
+    H, ph = stats.kruskal(*groups)
+    log(f"Kruskal-Wallis (raw)     : H = {H:.1f},  p = {ph:.3e}")
+    # eta^2 effect size from ANOVA
+    grand = sub["log_power"].mean()
+    ss_between = sum(len(g) * (np.log(g).mean() - grand) ** 2 for g in groups)
+    ss_total = ((sub["log_power"] - grand) ** 2).sum()
+    log(f"eta^2 (ANOVA)            : {ss_between/ss_total:.3f}")
+    log(f"-> p << {C.ALPHA}: motorcycle category strongly explains engine power.")
+
+    tuk = pairwise_tukeyhsd(sub["log_power"], sub["category"], alpha=C.ALPHA)
+    tdf = pd.DataFrame(tuk.summary().data[1:], columns=tuk.summary().data[0])
+    U.save_table(tdf, C.RESULTS_DIR / "stat_C_tukey.csv", index=False)
+    n_sig = tdf["reject"].astype(str).eq("True").sum()
+    log(f"Tukey HSD: {n_sig} of {len(tdf)} category pairs differ significantly "
+        f"(see stat_C_tukey.csv).")
+
+
+def d_correlation(df):
+    U.section("D. Correlation tests (Pearson & Spearman)")
+    pairs = [("displacement_ccm", "power_hp"),
+             ("power_hp", "top_speed_kmh"),
+             ("dry_weight_kg", "top_speed_kmh"),
+             ("displacement_ccm", "torque_nm"),
+             ("compression_ratio", "power_weight_ratio")]
+    rows = []
+    for a, b in pairs:
+        s = df[[a, b]].dropna()
+        r, pr = stats.pearsonr(s[a], s[b])
+        rho, prho = stats.spearmanr(s[a], s[b])
+        rows.append([f"{a} ~ {b}", len(s), round(r, 3), f"{pr:.2e}",
+                     round(rho, 3), f"{prho:.2e}"])
+        log(f"{a:>18} ~ {b:<15} n={len(s):>6}  Pearson r={r:+.3f}  Spearman rho={rho:+.3f}")
+    tab = pd.DataFrame(rows, columns=["pair", "n", "pearson_r", "p_pearson",
+                                      "spearman_rho", "p_spearman"])
+    U.save_table(tab, C.RESULTS_DIR / "stat_D_correlation.csv", index=False)
+    log("-> Strong positive relationships; all p-values are effectively zero.")
+
+
+def e_independence(df):
+    U.section("E. Chi-square test of independence -- cooling x transmission")
+    sub = df.dropna(subset=["cooling", "transmission"])
+    sub = sub[sub["cooling"].isin(["Air", "Liquid", "Oil & air"])]
+    ct = pd.crosstab(sub["cooling"], sub["transmission"])
+    log("Contingency table (counts):")
+    log(ct.to_string())
+    chi2, p, dof, _ = stats.chi2_contingency(ct)
+    v = cramers_v(ct.values)
+    log(f"\nH0: cooling system and final-drive type are independent.")
+    log(f"chi-square = {chi2:.1f},  dof = {dof},  p = {p:.3e}")
+    log(f"Cramer's V = {v:.3f}  ({'strong' if v>=0.5 else 'moderate' if v>=0.3 else 'weak'} association)")
+    log(f"-> p << {C.ALPHA}: cooling system and final-drive type are statistically")
+    log("   DEPENDENT, but Cramer's V ~ 0.10 means the association is weak -- knowing")
+    log("   one feature only mildly shifts the odds of the other in practice.")
+    U.save_table(ct, C.RESULTS_DIR / "stat_E_contingency.csv")
+
+
+def f_regression(df):
+    U.section("F. Regression analysis")
+
+    # ----- Model A: physics-motivated log-log model -----------------------
+    log(">> Model A: log(top_speed) ~ log(power) + log(weight)")
+    log("   Aerodynamic theory: a drag-limited top speed scales as power^(1/3),")
+    log("   so we expect the coefficient on log(power) to be near 0.33.")
+    a = df.dropna(subset=["top_speed_kmh", "power_hp", "dry_weight_kg"]).copy()
+    a = a[(a.power_hp > 0) & (a.dry_weight_kg > 0) & (a.top_speed_kmh > 0)]
+    a["ltop"] = np.log(a.top_speed_kmh)
+    a["lpow"] = np.log(a.power_hp)
+    a["lwt"]  = np.log(a.dry_weight_kg)
+    mA = smf.ols("ltop ~ lpow + lwt", data=a).fit()
+    log(f"   n = {int(mA.nobs):,}   R^2 = {mA.rsquared:.3f}   adj R^2 = {mA.rsquared_adj:.3f}")
+    log(f"   coef log(power)  = {mA.params['lpow']:+.3f}  (95% CI "
+        f"{mA.conf_int().loc['lpow',0]:.3f} .. {mA.conf_int().loc['lpow',1]:.3f})")
+    log(f"   coef log(weight) = {mA.params['lwt']:+.3f}")
+    log(f"   -> empirical power exponent {mA.params['lpow']:.2f} vs theoretical 0.33.")
+
+    # ----- Model B: richer multivariable model ----------------------------
+    log("\n>> Model B: top_speed ~ power + weight + displacement + fuel_cap + cooling")
+    b = df.dropna(subset=["top_speed_kmh", "power_hp", "dry_weight_kg",
+                          "displacement_ccm", "fuel_capacity_l", "cooling"]).copy()
+    b = b[b["cooling"].isin(["Air", "Liquid", "Oil & air"])].copy()
+    # NB: a plain string column is auto-treated as categorical by patsy; we avoid
+    # the C() wrapper because it would clash with our `import config as C`.
+    b["cooling"] = b["cooling"].astype("category")
+    mB = smf.ols("top_speed_kmh ~ power_hp + dry_weight_kg + displacement_ccm "
+                 "+ fuel_capacity_l + cooling", data=b).fit()
+    log(f"   n = {int(mB.nobs):,}   R^2 = {mB.rsquared:.3f}   adj R^2 = {mB.rsquared_adj:.3f}")
+    log(f"   F = {mB.fvalue:.0f},  p(F) = {mB.f_pvalue:.2e}")
+
+    # save full statsmodels summaries
+    (C.RESULTS_DIR / "stat_F_regression_summary.txt").write_text(
+        "MODEL A: log(top_speed) ~ log(power) + log(weight)\n"
+        + mA.summary().as_text()
+        + "\n\n\nMODEL B: top_speed ~ power + weight + displacement + fuel_cap + cooling\n"
+        + mB.summary().as_text(), encoding="utf-8")
+    log("   full OLS summaries -> stat_F_regression_summary.txt")
+
+    # ----- VIF (multicollinearity diagnostic) for Model B -----------------
+    Xcols = ["power_hp", "dry_weight_kg", "displacement_ccm", "fuel_capacity_l"]
+    X = sm.add_constant(b[Xcols])
+    vif = pd.DataFrame({
+        "feature": Xcols,
+        "VIF": [variance_inflation_factor(X.values, i + 1) for i in range(len(Xcols))]
+    })
+    log("\n   Variance Inflation Factors (Model B numeric terms):")
+    log(vif.to_string(index=False))
+    U.save_table(vif, C.RESULTS_DIR / "stat_F_vif.csv", index=False)
+
+    # ----- residual diagnostics for Model A -------------------------------
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+    axes[0].scatter(mA.fittedvalues, mA.resid, s=6, alpha=0.2, color="#4C72B0")
+    axes[0].axhline(0, color="red", lw=1)
+    axes[0].set_xlabel("Fitted log(top speed)"); axes[0].set_ylabel("Residual")
+    axes[0].set_title("Model A: residuals vs fitted")
+    sm.qqplot(mA.resid, line="45", fit=True, ax=axes[1], markersize=3, alpha=0.3)
+    axes[1].set_title("Model A: Normal Q-Q of residuals")
+    fig.tight_layout()
+    U.savefig(fig, C.FIG_DIR / "03_regression_diagnostics.png")
+
+
+def g_one_sample(df):
+    U.section("G. One-sample t-test -- mean rating vs the neutral value 3.0")
+    r = df["rating"].dropna()
+    log("H0: the mean user rating equals the neutral value 3.0.")
+    t, p = stats.ttest_1samp(r, 3.0)
+    ci = stats.t.interval(0.95, len(r) - 1, loc=r.mean(), scale=stats.sem(r))
+    log(f"n = {len(r):,}   mean = {r.mean():.3f}")
+    log(f"one-sample t = {t:.1f},  p = {p:.2e},  95% CI = ({ci[0]:.3f}, {ci[1]:.3f})")
+    log("-> mean rating is significantly ABOVE 3.0: users skew positive.")
+
+
+def h_paired(df):
+    U.section("H. Paired tests -- bore vs stroke within the same engine")
+    # bore and stroke are two measurements on the SAME engine -> a paired design.
+    # bore>stroke == 'oversquare' (high-revving); bore<stroke == 'undersquare' (torquey).
+    pair = df[["bore_mm", "stroke_mm"]].dropna()
+    diff = pair["bore_mm"] - pair["stroke_mm"]
+    log("H0: within an engine, mean(bore) = mean(stroke)  (a 'square' engine).")
+    log(f"n = {len(pair):,}   mean(bore - stroke) = {diff.mean():.2f} mm")
+    tt, pt = stats.ttest_rel(pair["bore_mm"], pair["stroke_mm"])          # (a) parametric
+    w, pw = stats.wilcoxon(pair["bore_mm"], pair["stroke_mm"])            # (b) non-parametric
+    n_pos = int((diff > 0).sum()); n_eff = int((diff != 0).sum())        # (c) sign test
+    sign_p = stats.binomtest(n_pos, n_eff, 0.5).pvalue
+    log(f"(a) paired t-test       : t = {tt:.1f},  p = {pt:.2e}")
+    log(f"(b) Wilcoxon signed-rank: W = {w:.0f},  p = {pw:.2e}")
+    log(f"(c) sign test           : {n_pos}/{n_eff} have bore>stroke,  p = {sign_p:.2e}")
+    log("-> all three agree: engines are on average OVERSQUARE (bore>stroke).")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.hist(diff, bins=50, color="#4C72B0"); ax.axvline(0, color="red")
+    ax.set_title("Distribution of (bore - stroke)"); ax.set_xlabel("bore - stroke (mm)")
+    U.savefig(fig, C.FIG_DIR / "03_bore_minus_stroke.png")
+
+
+def i_two_proportion(df):
+    U.section("I. Two-sample proportion z-test -- fuel-injection adoption by era")
+    sub = df.dropna(subset=["year", "fuel_system"])
+    sub = sub[sub["fuel_system"].isin(["Injection", "Carburettor"])]
+    modern = sub[sub.year >= 2010]; older = sub[sub.year < 2010]
+    counts = [int((modern.fuel_system == "Injection").sum()),
+              int((older.fuel_system == "Injection").sum())]
+    nobs = [len(modern), len(older)]
+    z, p = proportions_ztest(counts, nobs)
+    log("H0: the share of fuel-injected bikes is equal in the two eras.")
+    log(f"modern (>=2010): {counts[0]/nobs[0]:.1%} injection  (n = {nobs[0]:,})")
+    log(f"older  (<2010) : {counts[1]/nobs[1]:.1%} injection  (n = {nobs[1]:,})")
+    log(f"two-proportion z = {z:.1f},  p = {p:.2e}")
+    log("-> fuel injection became significantly more prevalent in modern bikes.")
+
+
+def j_goodness_of_fit(df):
+    U.section("J. Chi-square goodness-of-fit -- are cooling systems equally common?")
+    obs = df["cooling"].value_counts().reindex(["Air", "Liquid", "Oil & air"]).dropna()
+    exp = [obs.sum() / len(obs)] * len(obs)          # expected counts under a uniform split
+    chi2, p = stats.chisquare(obs.values, exp)
+    log("H0: Air / Liquid / Oil & air each account for 1/3 of motorcycles.")
+    log("observed counts: " + str({k: int(v) for k, v in obs.items()}))
+    log(f"chi-square (GoF) = {chi2:.1f},  p = {p:.2e}")
+    log("-> the three cooling systems are NOT equally common (oil & air is rare).")
+    U.save_table(obs.rename("count").to_frame(), C.RESULTS_DIR / "stat_J_cooling_counts.csv")
+
+
+def main():
+    U.section("STEP 3  |  STATISTICAL METHODS")
+    df = pd.read_csv(C.CLEAN_CSV)
+    # --- core methods ---
+    a_normality(df)
+    b_two_group(df)
+    c_kgroup(df)
+    d_correlation(df)
+    e_independence(df)
+    f_regression(df)
+    # --- advanced hypothesis tests (synced from the notebook) ---
+    g_one_sample(df)
+    h_paired(df)
+    i_two_proportion(df)
+    j_goodness_of_fit(df)
+    log.save(C.RESULTS_DIR / "statistics_report.txt")
+    print("\nSTEP 3 complete. Tables/figures saved; transcript in results/.")
+
+
+if __name__ == "__main__":
+    main()
