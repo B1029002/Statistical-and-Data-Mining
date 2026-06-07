@@ -1,7 +1,7 @@
-# CE5033 Final Project — Motorcycle Specifications Analysis 🏍️
+# CE5033 Final Project — Motorcycle Specifications Analysis 
 
 A hybrid **statistics + data-mining** study of the Bikez.com motorcycle catalogue
-(**42,564 motorcycles × 105 fields**) for *CE5033 Statistical Methods and Data Mining* (NCU CSIE).
+(**42,564 motorcycles × 105 fields**) for *CE5033 Statistical Methods and Data Mining*.
 
 > **Read [`REPORT.md`](REPORT.md) for the full analytical write-up, results and presentation outline.**
 > This README is the codebase / reproducibility guide.
